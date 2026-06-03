@@ -33,7 +33,7 @@ class RealLeRobotCollector(Node):
         self.declare_parameter("image_size", 256)
         self.declare_parameter("robot_type", "ymbot")
         self.declare_parameter("image_topic", "/top/top/color/image_raw")
-        self.declare_parameter("wrist_image_topic", "/left/left/color/image_raw")
+        self.declare_parameter("wrist_image_topic", "/left/left/color/image_rect_raw")
         self.declare_parameter("joint_state_topic", "/joint_states")
         self.declare_parameter("hand_grasp_topic", "/hand_grasp")
         self.declare_parameter("record_command_topic", "/record_command")
