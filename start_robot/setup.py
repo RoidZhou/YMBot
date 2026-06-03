@@ -20,5 +20,9 @@ setup(
     description='TODO: Package description',
     license='TODO: License declaration',
     extras_require={'test': ['pytest']},
-    entry_points={},
+    entry_points={
+        'console_scripts': [
+            'real_lerobot_collector = start_robot.real_lerobot_collector:main',
+        ],
+    },
 )

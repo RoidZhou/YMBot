@@ -11,7 +11,9 @@ from launch.actions import (
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.actions import Node
 from launch.event_handlers import OnProcessStart
+from launch.conditions import IfCondition
 
 END_EFFECTOR_CMD_MAP = {
     'hand': {
@@ -209,6 +211,42 @@ def generate_launch_description():
         description='Right end effector type: auto | hand | gripper | drill'
     )
 
+    enable_data_collection_arg = DeclareLaunchArgument(
+        name='enable_data_collection',
+        default_value='true',
+        description='Start LeRobot data collector node (true/false)'
+    )
+
+    dataset_root_arg = DeclareLaunchArgument(
+        name='dataset_root',
+        default_value='/home/zhou/vla/lerobot-mujoco-tutorial/real_vr_data',
+        description='LeRobot dataset root directory'
+    )
+
+    dataset_repo_id_arg = DeclareLaunchArgument(
+        name='dataset_repo_id',
+        default_value='ymbot_real_vr',
+        description='LeRobot dataset repo_id'
+    )
+
+    dataset_task_arg = DeclareLaunchArgument(
+        name='dataset_task',
+        default_value='VR teleoperation',
+        description='Task text saved with each recorded frame'
+    )
+
+    dataset_image_topic_arg = DeclareLaunchArgument(
+        name='dataset_image_topic',
+        default_value='/top/top/color/image_raw',
+        description='Main observation image topic'
+    )
+
+    dataset_wrist_image_topic_arg = DeclareLaunchArgument(
+        name='dataset_wrist_image_topic',
+        default_value='/left/left/color/image_raw',
+        description='Wrist observation image topic'
+    )
+
     head_camera_launch = ExecuteProcess(
         cmd=[
             'ros2', 'launch', 'start_robot',
@@ -255,6 +293,12 @@ def generate_launch_description():
         end_effector_arg,
         left_effector_arg,
         right_effector_arg,
+        enable_data_collection_arg,
+        dataset_root_arg,
+        dataset_repo_id_arg,
+        dataset_task_arg,
+        dataset_image_topic_arg,
+        dataset_wrist_image_topic_arg,
 
         # 启动硬件及控制器
         IncludeLaunchDescription(
@@ -308,6 +352,24 @@ def generate_launch_description():
             cmd=['ros2', 'run', 'vr_receiver_tcp', 'vr_receiver_tcp'],
             output='screen',
             name='vr_receiver_node'
+        ),
+
+        # LeRobot/SmolVLA 数据采集节点；由 VR 手柄发布 /record_command 控制开始/结束
+        Node(
+            package='start_robot',
+            executable='real_lerobot_collector',
+            name='real_lerobot_collector',
+            output='screen',
+            parameters=[
+                {
+                    'root': LaunchConfiguration('dataset_root'),
+                    'repo_id': LaunchConfiguration('dataset_repo_id'),
+                    'task': LaunchConfiguration('dataset_task'),
+                    'image_topic': LaunchConfiguration('dataset_image_topic'),
+                    'wrist_image_topic': LaunchConfiguration('dataset_wrist_image_topic'),
+                }
+            ],
+            condition=IfCondition(LaunchConfiguration('enable_data_collection')),
         ),
 
         # ik解 & 碰撞检测

@@ -26,6 +26,8 @@ class ControllerPoseReceiver(Node):
         self.chassis_locked = True
         self._prev_right_both = False  # 用于检测 right(btn1&btn2) 的按下沿
         self._prev_left_both = False   # 用于检测 left(btn1&btn2) 的按下沿
+        self._prev_record_start_combo = False
+        self._prev_record_stop_combo = False
         
         # chord grace window
         self._chord_window_sec = 0.10   # 100ms，可调：0.06~0.12 常用
@@ -64,6 +66,7 @@ class ControllerPoseReceiver(Node):
         self.cmd_vel_pub = self.create_publisher(Twist, "/key_cmd_vel", 10)
         self.torso_joints_pub = self.create_publisher(Float32MultiArray, "/torso_joints_vel", 1)
         self.reset_pub = self.create_publisher(String, '/reset_command', 10)
+        self.record_pub = self.create_publisher(String, '/record_command', 10)
 
         # TCP通信初始化
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -339,6 +342,15 @@ class ControllerPoseReceiver(Node):
         if right_both and (not self._prev_right_both):
             self._handle_reset_command()
         self._prev_right_both = right_both
+
+        record_start_combo = bool(l_btn2 and r_btn1 and not l_btn1 and not r_btn2)
+        record_stop_combo = bool(l_btn1 and r_btn2 and not l_btn2 and not r_btn1)
+        if record_start_combo and (not self._prev_record_start_combo):
+            self._publish_record_command("start")
+        if record_stop_combo and (not self._prev_record_stop_combo):
+            self._publish_record_command("stop")
+        self._prev_record_start_combo = record_start_combo
+        self._prev_record_stop_combo = record_stop_combo
         
         # 左手 btn1+btn2：底盘锁定/解锁
         left_both = bool(l_btn1 and l_btn2)
@@ -401,6 +413,7 @@ class ControllerPoseReceiver(Node):
             l_btn1=l_btn1,
             l_btn2=l_btn2,
             r_btn1=r_btn1,
+            r_btn2=r_btn2,
             now_sec=t
         )
 
@@ -474,7 +487,8 @@ class ControllerPoseReceiver(Node):
             l_btn2=l_btn2,
             r_btn1=r_btn1,
             r_btn2=r_btn2,
-            block = combo_up or combo_down or right_both or left_both or chord_pending
+            block=combo_up or combo_down or right_both or left_both or chord_pending
+            or record_start_combo or record_stop_combo
         )
 
         return True
@@ -484,7 +498,7 @@ class ControllerPoseReceiver(Node):
         msg.data = int(self.drill_control)
         self.drill_control_pub.publish(msg)
 
-    def _handle_drill_toggle_click(self, l_btn1: bool, l_btn2: bool, r_btn1: bool, now_sec: float):
+    def _handle_drill_toggle_click(self, l_btn1: bool, l_btn2: bool, r_btn1: bool, r_btn2: bool, now_sec: float):
         """
         仅在底盘锁定时，把 left.btn1 识别成“单键短按释放”：
         - 按下时先进入候选态
@@ -506,7 +520,7 @@ class ControllerPoseReceiver(Node):
             self._left_btn1_press_time = now_sec
 
         # 按住期间，一旦发现参与组合键，取消这次点击
-        if self._left_btn1_click_candidate and (l_btn2 or r_btn1):
+        if self._left_btn1_click_candidate and (l_btn2 or r_btn1 or r_btn2):
             self._left_btn1_click_candidate = False
 
         # 松开时，若仍是有效点击，则切换状态
@@ -520,6 +534,12 @@ class ControllerPoseReceiver(Node):
             self._left_btn1_click_candidate = False
 
         self._prev_left_btn1 = l_btn1
+
+    def _publish_record_command(self, command: str):
+        msg = String()
+        msg.data = command
+        self.record_pub.publish(msg)
+        self.get_logger().info(f"record_command -> {command}")
 
     # 控制输出
     def _update_chassis_twist(self, l_btn1: bool, l_btn2: bool, r_btn1: bool, r_btn2: bool, block: bool):
