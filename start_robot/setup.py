@@ -23,6 +23,7 @@ setup(
     entry_points={
         'console_scripts': [
             'real_lerobot_collector = start_robot.real_lerobot_collector:main',
+            'real_policy_inference = start_robot.real_policy_inference:main',
         ],
     },
 )
